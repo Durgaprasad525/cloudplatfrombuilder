@@ -1,0 +1,36 @@
+import { Queue, QueueOptions } from 'bullmq';
+import type { InferenceJobData } from '@gpu-cloud/shared';
+
+const REDIS_URL = process.env.REDIS_URL || 'redis://localhost:6379';
+const connection = {
+  host: new URL(REDIS_URL).hostname,
+  port: parseInt(new URL(REDIS_URL).port || '6379', 10),
+};
+
+const queueOptions: QueueOptions = {
+  connection,
+  defaultJobOptions: {
+    attempts: 3,
+    backoff: { type: 'exponential', delay: 1000 },
+    removeOnComplete: { count: 1000 },
+    removeOnFail: { count: 5000 },
+  },
+};
+
+export const inferenceQueue = new Queue<InferenceJobData>('inference', queueOptions);
+
+export async function addInferenceJob(data: InferenceJobData) {
+  return inferenceQueue.add('inference', data, {
+    jobId: data.requestId,
+  });
+}
+
+export async function getQueueHealth(): Promise<boolean> {
+  try {
+    const client = await inferenceQueue.client;
+    await client.ping();
+    return true;
+  } catch {
+    return false;
+  }
+}

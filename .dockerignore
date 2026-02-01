@@ -1,0 +1,11 @@
+node_modules
+.git
+.DS_Store
+dist
+.next
+backend/node_modules
+frontend/node_modules
+backend/dist
+shared/dist
+coverage
+.env

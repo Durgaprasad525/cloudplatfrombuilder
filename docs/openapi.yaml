@@ -1,0 +1,239 @@
+openapi: 3.0.3
+info:
+  title: GPU Cloud Platform API
+  description: Mini AI PaaS with OpenAI-compatible chat completions, API key management, and usage metrics.
+  version: 1.0.0
+
+servers:
+  - url: http://localhost:4000
+    description: Local API
+
+paths:
+  /health:
+    get:
+      summary: Health check
+      responses:
+        '200':
+          description: Service healthy
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status: { type: string, example: ok }
+                  services:
+                    type: object
+                    properties:
+                      database: { type: string }
+                      redis: { type: string }
+        '503':
+          description: Service degraded
+
+  /api/keys:
+    get:
+      summary: List API keys
+      responses:
+        '200':
+          description: List of keys (prefix, usage, last used)
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  keys:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/ApiKeySummary'
+    post:
+      summary: Create API key
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [name]
+              properties:
+                name: { type: string, description: Key display name }
+      responses:
+        '201':
+          description: Key created (raw key returned once)
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  id: { type: string }
+                  name: { type: string }
+                  key: { type: string, description: Raw key - only shown once }
+                  prefix: { type: string }
+                  createdAt: { type: string, format: date-time }
+        '400':
+          description: Invalid name
+
+  /api/keys/{id}:
+    delete:
+      summary: Revoke API key
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: string }
+      responses:
+        '204':
+          description: Key revoked
+        '404':
+          description: Key not found
+
+  /api/metrics:
+    get:
+      summary: Usage metrics
+      parameters:
+        - name: apiKeyId
+          in: query
+          schema: { type: string }
+          description: Filter by API key
+        - name: hours
+          in: query
+          schema: { type: integer, default: 24 }
+          description: Hours of history
+      responses:
+        '200':
+          description: Time series and optional summary
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  timeSeries:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        timestamp: { type: string }
+                        requestCount: { type: integer }
+                        tokenCount: { type: integer }
+                  summary:
+                    $ref: '#/components/schemas/UsageSummary'
+                  apiKeyId: { type: string }
+
+  /v1/chat/completions:
+    post:
+      summary: OpenAI-compatible chat completions (streaming and non-streaming)
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ChatCompletionRequest'
+      responses:
+        '200':
+          description: Completion or SSE stream
+          headers:
+            X-RateLimit-Limit: { schema: { type: integer } }
+            X-RateLimit-Remaining: { schema: { type: integer } }
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ChatCompletionResponse'
+            text/event-stream:
+              schema:
+                type: string
+                description: SSE stream of chat.completion.chunk
+        '400':
+          description: Invalid request (model, messages)
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+        '401':
+          description: Missing or invalid API key
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+        '429':
+          description: Rate limit exceeded
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+
+components:
+  securitySchemes:
+    BearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: API Key
+      description: API key in Authorization header
+
+  schemas:
+    ApiKeySummary:
+      type: object
+      properties:
+        id: { type: string }
+        name: { type: string }
+        prefix: { type: string }
+        createdAt: { type: string, format: date-time }
+        lastUsedAt: { type: string, format: date-time, nullable: true }
+        usageCount: { type: integer }
+
+    UsageSummary:
+      type: object
+      properties:
+        apiKeyId: { type: string }
+        totalRequests: { type: integer }
+        totalTokens: { type: integer }
+        avgLatencyMs: { type: integer }
+
+    ChatCompletionRequest:
+      type: object
+      required: [model, messages]
+      properties:
+        model: { type: string, example: gpt-3.5-turbo }
+        messages:
+          type: array
+          items:
+            type: object
+            required: [role, content]
+            properties:
+              role: { type: string, enum: [system, user, assistant] }
+              content: { type: string }
+        stream: { type: boolean, default: false }
+        temperature: { type: number }
+        max_tokens: { type: integer }
+
+    ChatCompletionResponse:
+      type: object
+      properties:
+        id: { type: string }
+        object: { type: string, example: chat.completion }
+        created: { type: integer }
+        model: { type: string }
+        choices:
+          type: array
+          items:
+            type: object
+            properties:
+              index: { type: integer }
+              message:
+                type: object
+                properties:
+                  role: { type: string }
+                  content: { type: string }
+              finish_reason: { type: string }
+        usage:
+          type: object
+          properties:
+            prompt_tokens: { type: integer }
+            completion_tokens: { type: integer }
+            total_tokens: { type: integer }
+
+    Error:
+      type: object
+      properties:
+        error:
+          type: object
+          properties:
+            message: { type: string }
+            type: { type: string }
+            code: { type: string }
