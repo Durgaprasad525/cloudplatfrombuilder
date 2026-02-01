@@ -43,7 +43,9 @@ This guide walks through deploying the GPU Cloud API backend to [Railway](https:
 
 ### Build & run (Docker)
 
-- **Build**: Railway can use the existing Dockerfile.
+The repo includes **`railway.json`** at the root so Railway uses the **Dockerfile** (not Railpack). If you see *"Script start.sh not found"* or *"Railpack could not determine how to build"*, ensure the full project is pushed and add variable **`RAILWAY_DOCKERFILE_PATH`** = **`backend/Dockerfile`** in Railway, then redeploy.
+
+- **Build**: Railway uses the existing Dockerfile (via `railway.json` or `RAILWAY_DOCKERFILE_PATH`).
 - **Dockerfile path**: `backend/Dockerfile`
 - **Root directory**: leave default (repo root). Railway uses the repo root as build context, so the Dockerfile’s `COPY` paths are correct.
 - **Start command**: leave default (the Dockerfile `CMD` runs `node dist/index.js`).
