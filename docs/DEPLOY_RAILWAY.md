@@ -65,9 +65,9 @@ In the backend service → **Variables** (or **Settings** → **Variables**):
    Use “Add variable” / “Reference” and select the Postgres service’s **`DATABASE_URL`**. Railway will inject it.
 
 2. **Link Redis**  
-   Add a reference to the Redis service’s **`REDIS_URL`** (or the variable name Railway shows). If Redis only exposes a host/port, set:
-   - `REDIS_URL=redis://default:<password>@<host>:<port>`
-   using the values from the Redis service.
+   Use the Redis service’s **public** URL so the backend can resolve the hostname. Reference **`REDIS_PUBLIC_URL`** (not `REDIS_URL`), or the backend will get `redis.railway.internal`, which may not resolve and cause `ENOTFOUND redis.railway.internal`. Set:
+   - **`REDIS_URL`** = **`${{Redis.REDIS_PUBLIC_URL}}`**
+   If you paste values manually, use the URL that contains `.proxy.rlwy.net` (the public proxy), not `redis.railway.internal`.
 
 3. **Migrations**
    - Add: **`RUN_MIGRATIONS`** = **`1`**  
@@ -76,13 +76,28 @@ In the backend service → **Variables** (or **Settings** → **Variables**):
 4. **PORT**  
    Railway sets **`PORT`** automatically; the backend already uses `process.env.PORT`, so no need to set it.
 
+**Paste in Variables (Raw Editor):**  
+In the backend service → **Variables** → open the **RAW** editor and paste:
+
+```json
+{
+  "DATABASE_URL": "${{Postgres.DATABASE_URL}}",
+  "REDIS_URL": "${{Redis.REDIS_PUBLIC_URL}}",
+  "RUN_MIGRATIONS": "1"
+}
+```
+
+Use **`REDIS_PUBLIC_URL`** for Redis so the backend connects via the public proxy hostname (`.proxy.rlwy.net`). Using `REDIS_URL` (internal host `redis.railway.internal`) can cause `ENOTFOUND` if private networking isn’t available.
+
+Replace `Postgres` and `Redis` with your actual Postgres and Redis **service names** in the project if different (e.g. `${{MyPostgres.DATABASE_URL}}`).
+
 Example variables:
 
-| Variable         | Value / source                    |
-|------------------|-----------------------------------|
-| `DATABASE_URL`   | Referenced from Postgres service |
-| `REDIS_URL`      | Referenced from Redis service    |
-| `RUN_MIGRATIONS` | `1`                              |
+| Variable         | Value / source                          |
+|------------------|-----------------------------------------|
+| `DATABASE_URL`   | Referenced from Postgres service        |
+| `REDIS_URL`      | Referenced from Redis **REDIS_PUBLIC_URL** |
+| `RUN_MIGRATIONS` | `1`                                     |
 
 ---
 
@@ -100,6 +115,10 @@ Example variables:
 1. **Health**
    - Open `https://<your-backend-url>/health` in a browser or with `curl`.
    - You should see JSON with `"status":"ok"` and `database` / `redis` up when Postgres and Redis are linked correctly.
+
+**If healthcheck never becomes healthy:** The server now starts first and then checks DB/Redis, so the process stays up. Check deployment logs: if you see “Cannot connect to PostgreSQL” or “Cannot connect to Redis”, use the **public** URLs for both:
+- **`REDIS_URL`** = Redis service’s **REDIS_PUBLIC_URL** (host like `*.proxy.rlwy.net`, not `redis.railway.internal`).
+- **`DATABASE_URL`** = Postgres service’s **DATABASE_PUBLIC_URL** (host like `*.proxy.rlwy.net`, not `postgres.railway.internal`) if the internal host doesn’t resolve.
 
 2. **API**
    - Create a key:  
@@ -124,6 +143,7 @@ The repo also has a **worker** process (`worker.ts`) that consumes the BullMQ qu
 
 | Issue | Check |
 |-------|--------|
+| **"1/1 replicas never became healthy"** | Add Postgres and Redis; in backend Variables reference `DATABASE_URL` and `REDIS_URL`, set `RUN_MIGRATIONS` = `1`; redeploy; check Logs. |
 | Build fails (e.g. “module not found”) | Ensure build uses repo root and builds `@gpu-cloud/shared` then backend (Docker or build command above). |
 | 503 / DB or Redis down | In `/health`, see which service is down. Confirm `DATABASE_URL` and `REDIS_URL` are set and linked from Postgres/Redis. |
 | “Relation does not exist” | Set `RUN_MIGRATIONS=1` and redeploy so migrations run on startup. |

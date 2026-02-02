@@ -47,43 +47,38 @@ app.use((err: Error, _req: express.Request, res: express.Response, _next: expres
 });
 
 async function start() {
-  const dbOk = await healthCheck();
-  const queueOk = await getQueueHealth();
+  // Listen first so the process stays up and /health is reachable (returns 503 if DB/Redis down).
+  // This prevents Railway/containers from exiting before the healthcheck can run or show logs.
+  const server = app.listen(PORT, async () => {
+    console.log(`GPU Cloud API listening on http://localhost:${PORT}`);
+    console.log('  Health: GET /health');
+    console.log('  OpenAI: POST /v1/chat/completions');
+    console.log('  Keys:   GET/POST/DELETE /api/keys');
+    console.log('  Metrics: GET /api/metrics');
 
-  if (!dbOk) {
-    console.error('Cannot connect to PostgreSQL. Start it first, e.g.:');
-    console.error('  docker-compose up -d postgres');
-    console.error('Then run migrations: npm run db:migrate -w @gpu-cloud/backend');
-    process.exit(1);
-  }
-
-  if (process.env.RUN_MIGRATIONS === '1') {
-    try {
-      await runMigrations();
-    } catch (err) {
-      console.error('Startup migration failed:', err);
-      process.exit(1);
+    const dbOk = await healthCheck();
+    if (!dbOk) {
+      console.error('Cannot connect to PostgreSQL. Check DATABASE_URL.');
+      return;
     }
-  }
+    if (process.env.RUN_MIGRATIONS === '1') {
+      try {
+        await runMigrations();
+      } catch (err) {
+        console.error('Startup migration failed:', err);
+        return;
+      }
+    }
+    const queueOk = await getQueueHealth();
+    if (!queueOk) {
+      console.error('Cannot connect to Redis. Check REDIS_URL (use public URL if internal host fails).');
+    }
+  });
 
-  if (!queueOk) {
-    console.error('Cannot connect to Redis. Start it first, e.g.:');
-    console.error('  docker-compose up -d redis');
-    process.exit(1);
-  }
-
-  try {
-    app.listen(PORT, () => {
-      console.log(`GPU Cloud API listening on http://localhost:${PORT}`);
-      console.log('  Health: GET /health');
-      console.log('  OpenAI: POST /v1/chat/completions');
-      console.log('  Keys:   GET/POST/DELETE /api/keys');
-      console.log('  Metrics: GET /api/metrics');
-    });
-  } catch (err) {
+  server.on('error', (err) => {
     console.error('Failed to start server:', err);
     process.exit(1);
-  }
+  });
 }
 
 start();
