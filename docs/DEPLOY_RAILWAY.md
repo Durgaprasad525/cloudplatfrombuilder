@@ -43,12 +43,13 @@ This guide walks through deploying the GPU Cloud API backend to [Railway](https:
 
 ### Build & run (Docker)
 
-The repo includes **`railway.json`** at the root so Railway uses the **Dockerfile** (not Railpack). If you see *"Script start.sh not found"* or *"Railpack could not determine how to build"*, ensure the full project is pushed and add variable **`RAILWAY_DOCKERFILE_PATH`** = **`backend/Dockerfile`** in Railway, then redeploy.
+There is **no** `railway.json` at the repo root so that the **frontend** service can use its own Dockerfile via the dashboard. For the **backend** service you must set:
 
-- **Build**: Railway uses the existing Dockerfile (via `railway.json` or `RAILWAY_DOCKERFILE_PATH`).
-- **Dockerfile path**: `backend/Dockerfile`
-- **Root directory**: leave default (repo root). Railway uses the repo root as build context, so the Dockerfile’s `COPY` paths are correct.
-- **Start command**: leave default (the Dockerfile `CMD` runs `node dist/index.js`).
+- **Variables** → **`RAILWAY_DOCKERFILE_PATH`** = **`backend/Dockerfile`**
+- **Settings** → **Deploy** → **Healthcheck path**: **`/health`** (optional but recommended)
+
+- **Root directory**: leave default (repo root). Build context is repo root so the Dockerfile’s `COPY` paths are correct.
+- **Start command**: leave empty (the Dockerfile `CMD` runs `node dist/index.js`).
 
 If your Railway plan uses **Nixpacks** instead of Docker:
 
@@ -81,6 +82,7 @@ In the backend service → **Variables** → open the **RAW** editor and paste:
 
 ```json
 {
+  "RAILWAY_DOCKERFILE_PATH": "backend/Dockerfile",
   "DATABASE_URL": "${{Postgres.DATABASE_URL}}",
   "REDIS_URL": "${{Redis.REDIS_PUBLIC_URL}}",
   "RUN_MIGRATIONS": "1"
@@ -93,11 +95,12 @@ Replace `Postgres` and `Redis` with your actual Postgres and Redis **service nam
 
 Example variables:
 
-| Variable         | Value / source                          |
-|------------------|-----------------------------------------|
-| `DATABASE_URL`   | Referenced from Postgres service        |
-| `REDIS_URL`      | Referenced from Redis **REDIS_PUBLIC_URL** |
-| `RUN_MIGRATIONS` | `1`                                     |
+| Variable                  | Value / source                          |
+|---------------------------|-----------------------------------------|
+| `RAILWAY_DOCKERFILE_PATH` | `backend/Dockerfile`                    |
+| `DATABASE_URL`            | Referenced from Postgres service        |
+| `REDIS_URL`               | Referenced from Redis **REDIS_PUBLIC_URL** |
+| `RUN_MIGRATIONS`          | `1`                                     |
 
 ---
 
@@ -128,7 +131,59 @@ Example variables:
 
 ---
 
-## 7. (Optional) Workers
+## 7. Deploy Frontend (dashboard)
+
+Deploy the Next.js dashboard from the same repo as a **separate service** so it uses your deployed backend API.
+
+### Add Frontend service
+
+1. In the same Railway project, click **+ New** → **GitHub Repo** (or **Service** if you already have the repo).
+2. Select the **same repository** as the backend.
+3. Configure the service to use the frontend Dockerfile (otherwise Railway uses the root `railway.json` and builds the **backend** image for this service):
+
+**Build (Docker) – required**
+
+- There is no root `railway.json` in the repo, so the frontend service will use dashboard settings. In the **frontend** service → **Variables**, add:
+  - **`RAILWAY_DOCKERFILE_PATH`** = **`frontend/Dockerfile`**
+  Without this, Railway may auto-detect the backend Dockerfile and you may see **"No workspaces found: --workspace=@gpu-cloud/frontend"** or healthcheck on `/health` failing.
+- **Root directory**: leave default (repo root). Build context must be repo root so the Dockerfile can `COPY` workspace files.
+- **Settings** → **Build** / **Deploy**: leave **Custom Build Command** and **Start Command** empty so the Dockerfile controls build and run (`node server.js`).
+
+**Variables (required)**
+
+- **`NEXT_PUBLIC_API_URL`** = your backend’s public URL, e.g. `https://your-backend-name.up.railway.app`  
+  **Important:** Next.js bakes `NEXT_PUBLIC_*` into the client at **build time**. Set this variable **before** the first build (or redeploy after setting it) so the dashboard calls the correct API.
+
+**Paste in Variables (Raw Editor):**
+
+```json
+{
+  "RAILWAY_DOCKERFILE_PATH": "frontend/Dockerfile",
+  "NEXT_PUBLIC_API_URL": "https://YOUR_BACKEND_URL.up.railway.app"
+}
+```
+
+Replace `YOUR_BACKEND_URL` with your actual backend service domain (from Backend → Settings → Networking → Public URL).
+
+### Deploy and expose
+
+1. Save variables and trigger a deploy (or push to the connected branch).
+2. After the build finishes, open the **Frontend** service → **Settings** → **Networking** → **Generate domain** (or **Public URL**). You’ll get something like:
+   - `https://your-frontend-name.up.railway.app`
+3. Open that URL in a browser. The dashboard should load and use the backend URL you set in `NEXT_PUBLIC_API_URL` (API keys, metrics, etc.).
+
+### Frontend variables summary
+
+| Variable                  | Value / purpose                                      |
+|---------------------------|------------------------------------------------------|
+| `RAILWAY_DOCKERFILE_PATH` | `frontend/Dockerfile` (so this service builds the frontend) |
+| `NEXT_PUBLIC_API_URL`     | Backend public URL (e.g. `https://...up.railway.app`) |
+
+`PORT` is set by Railway; the frontend Dockerfile already uses `PORT` and `HOSTNAME="0.0.0.0"`.
+
+---
+
+## 8. (Optional) Workers
 
 The repo also has a **worker** process (`worker.ts`) that consumes the BullMQ queue. On Railway you can:
 
@@ -147,10 +202,11 @@ The repo also has a **worker** process (`worker.ts`) that consumes the BullMQ qu
 | Build fails (e.g. “module not found”) | Ensure build uses repo root and builds `@gpu-cloud/shared` then backend (Docker or build command above). |
 | 503 / DB or Redis down | In `/health`, see which service is down. Confirm `DATABASE_URL` and `REDIS_URL` are set and linked from Postgres/Redis. |
 | “Relation does not exist” | Set `RUN_MIGRATIONS=1` and redeploy so migrations run on startup. |
-| CORS errors from frontend | Backend uses `cors()` with default (allows all). If you restrict origins later, add your Vercel/frontend URL. |
+| CORS errors from frontend | Backend uses `cors()` with default (allows all). If you restrict origins later, add your frontend URL. |
+| Frontend builds backend instead | Set **`RAILWAY_DOCKERFILE_PATH`** = **`frontend/Dockerfile`** in the frontend service Variables so Railway uses the frontend Dockerfile. |
+| Frontend shows “Ensure the API is running” | Set **`NEXT_PUBLIC_API_URL`** to your backend public URL and **redeploy** (Next.js bakes it in at build time). |
+| **"No workspaces found: --workspace=@gpu-cloud/frontend"** on frontend | The frontend service is building with the **backend** Dockerfile (root `railway.json`). Set **`RAILWAY_DOCKERFILE_PATH`** = **`frontend/Dockerfile`** in the **frontend** service Variables and clear any custom **Start Command** in Settings → Build/Deploy, then redeploy. |
 
 ---
 
-## Next: frontend (e.g. Vercel)
-
-After the backend is live, set your frontend’s **`NEXT_PUBLIC_API_URL`** to your Railway backend URL (e.g. `https://your-backend-name.up.railway.app`) so the dashboard calls the deployed API.
+**Frontend on Railway:** See [§ 7. Deploy Frontend](#7-deploy-frontend-dashboard) above. Set **`RAILWAY_DOCKERFILE_PATH`** = **`frontend/Dockerfile`** and **`NEXT_PUBLIC_API_URL`** = your backend URL, then deploy and generate a domain.
