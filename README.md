@@ -2,6 +2,16 @@
 
 A mini AI PaaS platform with OpenAI-compatible API, API key management, distributed inference queue, and usage dashboard.
 
+---
+
+### Live demo
+
+**[→ Open live demo (Railway)](https://gpu-cloudfrontend-production.up.railway.app/)**
+
+Dashboard: API keys, deployed models, and usage metrics. Backend API and frontend are deployed on Railway.
+
+---
+
 ## Prerequisites
 
 - **Node.js 18+**
@@ -60,8 +70,10 @@ docker-compose up --build
 
 ## Deployment
 
-- **Backend (Railway):** [Deploy backend to Railway](docs/DEPLOY_RAILWAY.md) — Postgres + Redis add-ons, Dockerfile `backend/Dockerfile`, set `RUN_MIGRATIONS=1` and link `DATABASE_URL` / `REDIS_URL`. Then use the generated public URL as your API base.
-- **Frontend (Vercel):** Deploy the `frontend` app to Vercel; set **`NEXT_PUBLIC_API_URL`** to your Railway backend URL so the dashboard calls the live API.
+Both **backend** and **frontend** are deployed on **Railway**. See [Deploy to Railway](docs/DEPLOY_RAILWAY.md) for full steps.
+
+- **Backend:** Postgres + Redis add-ons, Dockerfile `backend/Dockerfile`, set `RAILWAY_DOCKERFILE_PATH=backend/Dockerfile`, `RUN_MIGRATIONS=1`, and link `DATABASE_URL` / `REDIS_URL`.
+- **Frontend:** Same Railway project; add a second service with `RAILWAY_DOCKERFILE_PATH=frontend/Dockerfile` and `NEXT_PUBLIC_API_URL` = your backend public URL.
 
 ## API Keys
 
