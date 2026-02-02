@@ -2,6 +2,8 @@
 
 This guide walks through deploying the GPU Cloud API backend to [Railway](https://railway.app). Railway will run the Node.js API and provide Postgres and Redis add-ons.
 
+**Important:** Do **not** add a `railway.json` at the repo root. Railway applies config-in-code to **all** services from this repo. A root config with `dockerfilePath: "backend/Dockerfile"` would make the **frontend** service build the backend image (causing errors like "Cannot find module '/app/backend/server.js'"). Each service must set **`RAILWAY_DOCKERFILE_PATH`** in the dashboard instead (backend: `backend/Dockerfile`, frontend: `frontend/Dockerfile`).
+
 ## Prerequisites
 
 - GitHub repo pushed (this project)
