@@ -87,7 +87,7 @@ In the backend service → **Variables** → open the **RAW** editor and paste:
 }
 ```
 
-Use **`REDIS_PUBLIC_URL`** for Redis so the backend connects via the public proxy hostname (`.proxy.rlwy.net`). Using `REDIS_URL` (internal host `redis.railway.internal`) can cause `ENOTFOUND` if private networking isn’t available.
+Use **`REDIS_PUBLIC_URL`** as the **value** for the variable **`REDIS_URL`**: the backend reads only **`REDIS_URL`**. So set `REDIS_URL` = `${{Redis.REDIS_PUBLIC_URL}}` (or paste the public `redis://...@*.proxy.rlwy.net:...` URL). Using the internal host `redis.railway.internal` can cause `ENOTFOUND`; if you see `ECONNREFUSED 127.0.0.1:6379`, the app did not receive `REDIS_URL` (wrong variable name or not set).
 
 Replace `Postgres` and `Redis` with your actual Postgres and Redis **service names** in the project if different (e.g. `${{MyPostgres.DATABASE_URL}}`).
 

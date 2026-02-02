@@ -8,11 +8,9 @@ import { mockInference } from './services/inferenceService';
 import { recordInferenceUsage, countTokens } from './services/inferenceService';
 import type { InferenceJobData } from '@gpu-cloud/shared';
 
-const REDIS_URL = process.env.REDIS_URL || 'redis://localhost:6379';
-const connection = {
-  host: new URL(REDIS_URL).hostname,
-  port: parseInt(new URL(REDIS_URL).port || '6379', 10),
-};
+import { createRedisConnection } from './redis';
+
+const connection = createRedisConnection();
 
 const worker = new Worker<InferenceJobData>(
   'inference',

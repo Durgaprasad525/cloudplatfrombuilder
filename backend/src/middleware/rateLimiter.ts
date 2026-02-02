@@ -1,7 +1,6 @@
 import { Request, Response, NextFunction } from 'express';
 import Redis from 'ioredis';
-
-const REDIS_URL = process.env.REDIS_URL || 'redis://localhost:6379';
+import { getRedisUrl } from '../redis';
 const WINDOW_SECONDS = 60;
 const DEFAULT_LIMIT = 100; // requests per minute per API key
 
@@ -9,7 +8,7 @@ let redis: Redis | null = null;
 
 function getRedis(): Redis {
   if (!redis) {
-    redis = new Redis(REDIS_URL, { maxRetriesPerRequest: 3 });
+    redis = new Redis(getRedisUrl(), { maxRetriesPerRequest: 3 });
   }
   return redis;
 }

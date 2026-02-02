@@ -8,12 +8,6 @@ import {
 } from '../services/inferenceService';
 import type { ChatCompletionRequest, ChatCompletionChunk } from '@gpu-cloud/shared';
 
-const REDIS_URL = process.env.REDIS_URL || 'redis://localhost:6379';
-const connection = {
-  host: new URL(REDIS_URL).hostname,
-  port: parseInt(new URL(REDIS_URL).port || '6379', 10),
-};
-
 /**
  * Non-streaming: wait for job result from queue (with timeout).
  * In a full implementation the worker would process the job; here we optionally
