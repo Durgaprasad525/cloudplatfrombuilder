@@ -10,6 +10,39 @@ A mini AI PaaS platform with OpenAI-compatible API, API key management, distribu
 
 Dashboard: API keys, deployed models, and usage metrics. Backend API and frontend are deployed on Railway.
 
+### Sample API calls (live demo backend)
+
+Replace `YOUR_API_KEY` with a key from the dashboard (create one at the link above, then copy the key).
+
+**1. Health check**
+```bash
+curl -s https://cloudplatfrombuilder-production.up.railway.app/health | jq
+```
+
+**2. Create an API key**
+```bash
+curl -s -X POST https://cloudplatfrombuilder-production.up.railway.app/api/keys \
+  -H "Content-Type: application/json" \
+  -d '{"name":"CLI Test"}' | jq
+```
+Copy the `key` from the response for the next calls.
+
+**3. Chat completion (any supported model)**
+```bash
+curl -s -X POST https://cloudplatfrombuilder-production.up.railway.app/v1/chat/completions \
+  -H "Content-Type: application/json" \
+  -H "Authorization: Bearer YOUR_API_KEY" \
+  -d '{"model":"gpt-4","messages":[{"role":"user","content":"Say hello in one sentence."}]}' | jq
+```
+Supported `model` values: `gpt-3.5-turbo`, `gpt-4`, `gpt-4o`, `llama-2-7b`, `mistral-7b`, `mixtral-8x7b`, and others (see [Inference](#inference) below).
+
+**4. List keys**
+```bash
+curl -s https://cloudplatfrombuilder-production.up.railway.app/api/keys \
+  -H "Authorization: Bearer YOUR_API_KEY" | jq
+```
+(Some endpoints may allow unauthenticated list; if 401, use a valid key.)
+
 ---
 
 ## Prerequisites
@@ -74,6 +107,38 @@ Both **backend** and **frontend** are deployed on **Railway**. See [Deploy to Ra
 
 - **Backend:** Postgres + Redis add-ons, Dockerfile `backend/Dockerfile`, set `RAILWAY_DOCKERFILE_PATH=backend/Dockerfile`, `RUN_MIGRATIONS=1`, and link `DATABASE_URL` / `REDIS_URL`.
 - **Frontend:** Same Railway project; add a second service with `RAILWAY_DOCKERFILE_PATH=frontend/Dockerfile` and `NEXT_PUBLIC_API_URL` = your backend public URL.
+
+## Testing the deployed API with Postman (Railway)
+
+Use your **backend** public URL (not the frontend dashboard). In Railway: open the **backend** service → **Settings** → **Networking** → copy the **Public URL** (e.g. `https://cloudplatfrombuilder-backend-production.up.railway.app`). Use that as the base URL below.
+
+| Step | Method | URL | Headers | Body |
+|------|--------|-----|---------|------|
+| 1. Health | GET | `{{BASE_URL}}/health` | — | — |
+| 2. Create key | POST | `{{BASE_URL}}/api/keys` | `Content-Type: application/json` | `{"name": "Postman Test"}` |
+| 3. List keys | GET | `{{BASE_URL}}/api/keys` | — | — |
+| 4. Chat (no stream) | POST | `{{BASE_URL}}/v1/chat/completions` | `Content-Type: application/json`<br>`Authorization: Bearer <key>` | See below |
+| 5. Chat (stream) | POST | `{{BASE_URL}}/v1/chat/completions` | Same | Same + `"stream": true` |
+
+**Postman setup:**
+
+1. **Environment:** Create a variable `BASE_URL` = your backend URL (no trailing slash).
+2. **Step 1:** GET `{{BASE_URL}}/health` → expect `200` and `"status":"ok"`.
+3. **Step 2:** POST `{{BASE_URL}}/api/keys`, body raw JSON: `{"name": "Postman Test"}` → copy the `key` from the response (you only see it once).
+4. **Step 4:** POST `{{BASE_URL}}/v1/chat/completions`:
+   - Header: `Authorization: Bearer <paste the key>`  
+   - Body (raw JSON):
+   ```json
+   {
+     "model": "gpt-3.5-turbo",
+     "messages": [{"role": "user", "content": "Hello from Postman"}]
+   }
+   ```
+   For streaming, add `"stream": true` to the body.
+
+**Optional:** Revoke a key: DELETE `{{BASE_URL}}/api/keys/<key-id>` (get `id` from the list-keys response).
+
+---
 
 ## API Keys
 

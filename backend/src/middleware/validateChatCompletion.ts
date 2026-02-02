@@ -1,7 +1,20 @@
 import { Request, Response, NextFunction } from 'express';
 import type { ChatCompletionRequest } from '@gpu-cloud/shared';
 
-const SUPPORTED_MODEL = 'gpt-3.5-turbo';
+/** Model names accepted by the chat completions API (same mock inference for all). */
+export const SUPPORTED_MODELS = [
+  'gpt-3.5-turbo',
+  'gpt-4',
+  'gpt-4-turbo',
+  'gpt-4o',
+  'gpt-4o-mini',
+  'llama-2-7b',
+  'llama-2-13b',
+  'llama-2-70b',
+  'mistral-7b',
+  'mixtral-8x7b',
+  'falcon-40b',
+] as const;
 
 export function validateChatCompletionRequest(
   req: Request,
@@ -33,10 +46,10 @@ export function validateChatCompletionRequest(
     return;
   }
 
-  if (model !== SUPPORTED_MODEL) {
+  if (!SUPPORTED_MODELS.includes(model as (typeof SUPPORTED_MODELS)[number])) {
     res.status(400).json({
       error: {
-        message: `Model "${model}" is not supported. Use "${SUPPORTED_MODEL}".`,
+        message: `Model "${model}" is not supported. Use one of: ${SUPPORTED_MODELS.join(', ')}.`,
         type: 'invalid_request_error',
         code: 'model_not_found',
       },

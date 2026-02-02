@@ -4,7 +4,6 @@ import {
   buildCompletionResponse,
   countTokens,
   recordInferenceUsage,
-  SUPPORTED_MODEL,
 } from '../services/inferenceService';
 import type { ChatCompletionRequest, ChatCompletionChunk } from '@gpu-cloud/shared';
 

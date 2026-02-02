@@ -72,7 +72,7 @@ export default function DashboardPage() {
     <div className="space-y-12">
       {error && (
         <div className="rounded-lg border border-red-500/30 bg-red-500/10 px-4 py-3 text-red-300">
-          {error}. Ensure the API is running at {DEFAULT_API_URL}.
+          {error}. API base: {API_BASE}. If deployed, set NEXT_PUBLIC_API_URL to your backend URL and redeploy the frontend.
         </div>
       )}
 
