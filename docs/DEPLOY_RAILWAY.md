@@ -154,7 +154,7 @@ Deploy the Next.js dashboard from the same repo as a **separate service** so it 
 **Variables (required)**
 
 - **`NEXT_PUBLIC_API_URL`** = your backend’s public URL, e.g. `https://your-backend-name.up.railway.app`  
-  **Important:** Next.js bakes `NEXT_PUBLIC_*` into the client at **build time**. Set this variable **before** the first build (or redeploy after setting it) so the dashboard calls the correct API.
+  **Important:** Next.js bakes `NEXT_PUBLIC_*` into the client at **build time**. The frontend Dockerfile declares `ARG NEXT_PUBLIC_API_URL` so Railway passes this variable into the Docker build; set it in the frontend service Variables and redeploy so the built bundle uses your backend URL (not localhost).
 
 **Paste in Variables (Raw Editor):**
 

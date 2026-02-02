@@ -10,6 +10,9 @@ COPY shared/package.json ./shared/
 RUN npm ci
 
 FROM base AS builder
+# Railway passes service variables as build args; Next.js needs NEXT_PUBLIC_* at build time
+ARG NEXT_PUBLIC_API_URL
+ENV NEXT_PUBLIC_API_URL=$NEXT_PUBLIC_API_URL
 COPY --from=deps /app/node_modules ./node_modules
 COPY --from=deps /app/package.json ./
 COPY frontend ./frontend
